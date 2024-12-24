@@ -13,7 +13,7 @@ const registerUser = asyncHandler( async (req, res) => {
     //remove the password and refresh token from the response
     //check the user creation
     //return response
-
+    
     const {fullName, username, email, password} = req.body
 
     if ([fullName, username, email, password].some((field)=>{
@@ -53,7 +53,7 @@ const registerUser = asyncHandler( async (req, res) => {
     }
 
     const user = await User.create({
-        username : username.toLowerCase(),
+        username : username,
         email,
         fullName,
         avatar: uploadAvatar.url,
@@ -76,4 +76,57 @@ const registerUser = asyncHandler( async (req, res) => {
     )
 })
 
-export {registerUser}
+const loginUser = asyncHandler(async(req,res)=>{
+    
+    const {username, email, password} = req.body
+    
+    if(!username && !email){
+        res.status(400).json({
+            message : "Provide the Email and password"
+        })
+    }
+
+    const user = await User.findOne({
+        $or : [{username},{email}]
+    })
+    
+    if(!user){
+        res.status(400).json({
+            message : "User is not registered"
+        })
+    }
+
+    const isPasswordCorrect = await user.isPasswordCorrect(password)
+
+    if(!isPasswordCorrect){
+        res.status(400).json({
+            message : "Invalid User Credential"
+        })
+    }
+
+    const accesstoken = await user.generateAccessToken(user._id)
+    const refreshtoken = await user.generateRefreshToken(user._id)
+
+    const loggedInUser = await User.findById(user._id).select(
+        "-password -refreshtoken"
+    )
+
+    const options = {
+        httpOnly: true,
+        secure: true
+    };
+    
+    return res.status(201)
+    .cookie("accesstoken", accesstoken, options)
+    .cookie("refreshtoken", refreshtoken, options)
+    .json({
+        user: loggedInUser, accesstoken, refreshtoken,
+    
+        message : "User Registered successfully"
+    })
+    
+})
+
+export {registerUser,
+    loginUser
+}
