@@ -5,14 +5,14 @@ import { ApiResponse } from "../utils/ApiResponse.js";
 import jwt from "jsonwebtoken"
 import mongoose from "mongoose"
 
-const generateAccessandRefreshToken = (userID) => {
+const generateAccessandRefreshToken = async (userID) => {
     try {
-        const user = User.findById(userID)
+        const user = await User.findById(userID)
         const accessToken = user.generateAccessToken()
         const refreshToken = user.generateRefreshToken()
     
         user.refreshToken = refreshToken
-        user.save({validateBeforeSave : false})
+        await user.save({validateBeforeSave : false})
 
         return {accessToken, refreshToken}
 
@@ -159,7 +159,7 @@ const logoutUser = asyncHandler(async (req,res)=>{
         secure : true
     }
 
-    res.status(201)
+    return res.status(201)
     .clearCookie("accessToken", options)
     .clearCookie("refreshToken", options)
     .json({
@@ -180,7 +180,7 @@ const refreshAccessToken = asyncHandler(async(req, res) => {
     
         const decoded = jwt.verify(incomingRefreshToken, process.env.REFRESH_TOKEN_SECRET)
     
-        const user = User.findById(decoded._id)
+        const user = await User.findById(decoded._id)
     
         if(!user){
             res.status(401).json({
@@ -201,9 +201,9 @@ const refreshAccessToken = asyncHandler(async(req, res) => {
             secure : true
         }
     
-        res.status(201)
+        return res.status(201)
         .cookie("accessToken", accessToken, options)
-        .cookie("refreshToken", refreshToken, options)
+        .cookie("refreshToken", newrefreshToken, options)
         .json({
             user : {accessToken, refreshToken : newrefreshToken}, 
             message : "AccessToken Refreshed"
@@ -214,8 +214,79 @@ const refreshAccessToken = asyncHandler(async(req, res) => {
 
 })
 
+const ChangeCurrentPassword = asyncHandler(async (req,res) => {
+    const {oldpassword, newpassword} = req.body
+
+    const user = await User.findById(req.user?._id)
+    const ispassword = await user.isPasswordCorrect(oldpassword)
+
+    if(!ispassword){
+        res.status(401).json({
+            message : "Incorrect password"
+        })
+    }
+
+    await user.save({validateBeforeSave : false})
+
+    return res.status(201).json({
+        message : "Password Changed Successfully"
+    })
+})
+
+const GetCurrentUser = asyncHandler(async (req,res) => {
+    return res.status(201)
+    .json({
+        user : req.user,
+        message : "User Fetched Successfully"
+    })
+})
+
+const UpdateAccountDetails = asyncHandler(async(req,res) => {
+
+    const {fullName, email} = req.body
+
+    if(!fullName || !email){
+        return res.status(400).json({
+            message : "Provide Name and Email"
+        })
+    }
+
+    const user = await User.findById(req.user?._id).select("-password")
+
+    if(!user){
+        return res.status(401).json({
+            message : "Provide Correct Email"
+        })
+    }
+
+    user.fullName=fullName
+    user.email = email
+
+    return res.status(201)
+    .json({
+        user : user,
+        message : "User Details updated Successfully"
+    })
+
+})
+
+const updateUserAvatar = asyncHandler(async(req,res)=>{
+
+    const user = await User.findById(req.user?._id)
+
+    if(!user){
+        return res.status(401).json({
+            message : ""
+        })
+    }
+
+})
+
 export {registerUser,
     loginUser,
     logoutUser,
-    refreshAccessToken
+    refreshAccessToken,
+    ChangeCurrentPassword,
+    GetCurrentUser,
+    UpdateAccountDetails
 }

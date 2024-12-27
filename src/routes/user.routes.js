@@ -2,7 +2,10 @@ import { Router } from "express";
 import { registerUser ,
     loginUser,
     logoutUser,
-    refreshAccessToken
+    refreshAccessToken,
+    ChangeCurrentPassword,
+    GetCurrentUser,
+    UpdateAccountDetails
 } from "../controllers/user.controller.js";
 import {upload} from "../middleware/multer.middleware.js"
 import {verifyJWT} from "../middleware/auth.middleware.js"
@@ -24,6 +27,9 @@ userRouter.route("/register").post(upload.fields(
 
 userRouter.route("/login").post(loginUser)
 userRouter.route("/logout").post(verifyJWT,logoutUser)
-userRouter.route("/refreshtoken").post(refreshAccessToken)
+userRouter.route("/refresh-token").post(refreshAccessToken)
+userRouter.route("/change-password").post(verifyJWT, ChangeCurrentPassword)
+userRouter.route("/current-user").get(verifyJWT, GetCurrentUser)
+userRouter.route("/update-account").patch(verifyJWT, UpdateAccountDetails)
 
 export {userRouter}
