@@ -10,7 +10,8 @@ const generateAccessandRefreshToken = async (userID) => {
         const user = await User.findById(userID)
         const accessToken = user.generateAccessToken()
         const refreshToken = user.generateRefreshToken()
-    
+        // console.log(refreshToken);
+        
         user.refreshToken = refreshToken
         await user.save({validateBeforeSave : false})
 
@@ -37,7 +38,7 @@ const registerUser = asyncHandler( async (req, res) => {
     if ([fullName, username, email, password].some((field)=>{
         return field?.trim() === ""
     })) {
-        res.status(400).json({
+        return res.status(400).json({
             message : "Provide username and password"
         })
     }    
@@ -125,7 +126,11 @@ const loginUser = asyncHandler(async(req,res)=>{
     const accessToken = await user.generateAccessToken(user._id)
     const refreshToken = await user.generateRefreshToken(user._id)
 
-    const loggedInUser = await User.findById(user._id).select(
+    const loggedInUser = await User.findByIdAndUpdate(user._id, {
+        $set : {
+            refreshToken : refreshToken
+        }
+    }).select(
         "-password -refreshToken"
     )
 
@@ -138,7 +143,7 @@ const loginUser = asyncHandler(async(req,res)=>{
     .cookie("accessToken", accessToken, options)
     .cookie("refreshToken", refreshToken, options)
     .json({
-        user: loggedInUser, accesstoken, refreshtoken,
+        user: loggedInUser, accessToken, refreshToken,
     
         message : "User Registered successfully"
     })
@@ -170,8 +175,10 @@ const logoutUser = asyncHandler(async (req,res)=>{
 const refreshAccessToken = asyncHandler(async(req, res) => {
 
     try {
-        const incomingRefreshToken = req.body.refreshToken || req.cookies.refreshToken
-        
+    // console.log(req.cookies);
+    
+        const incomingRefreshToken = req.cookies.refreshToken || req.body.refreshToken
+        // console.log(incomingRefreshToken);
         if(!incomingRefreshToken){
             res.status(401).json({
                 message : "Unauthorized request"
@@ -187,15 +194,17 @@ const refreshAccessToken = asyncHandler(async(req, res) => {
                 message : "Invalid Refreshtoken"
             })
         }
-    
+        // console.log(user.refreshToken);
+        
         if(incomingRefreshToken != user?.refreshToken){
             res.status(401).json({
                 message : "Refresh token is expired or used"
             })
         }
     
-        const {accessToken, newrefreshToken} = generateAccessandRefreshToken(user._id)
-    
+        const {accessToken, refreshToken} = await generateAccessandRefreshToken(user._id)
+        // console.log(refreshToken);
+        
         const options = {
             httpOnly : true,
             secure : true
@@ -203,9 +212,9 @@ const refreshAccessToken = asyncHandler(async(req, res) => {
     
         return res.status(201)
         .cookie("accessToken", accessToken, options)
-        .cookie("refreshToken", newrefreshToken, options)
+        .cookie("refreshToken", refreshToken, options)
         .json({
-            user : {accessToken, refreshToken : newrefreshToken}, 
+            user : {accessToken, refreshToken}, 
             message : "AccessToken Refreshed"
         })
     } catch (error) {
@@ -272,14 +281,37 @@ const UpdateAccountDetails = asyncHandler(async(req,res) => {
 
 const updateUserAvatar = asyncHandler(async(req,res)=>{
 
-    const user = await User.findById(req.user?._id)
+    const user = await User.findById(req.user?._id).select("-password -refreshToken")
 
     if(!user){
         return res.status(401).json({
-            message : ""
+            message : "Unauthorized User"
         })
     }
 
+    const localStoragePathAvatar = req.file?.path
+
+    if(!localStoragePathAvatar){
+        return res.status(401).json({
+            message : "Avatar not Uploaded"
+        })
+    }
+
+    const uploadAvatar = await uploadonCloudinary(localStoragePathAvatar)
+
+    if(!uploadAvatar.url){
+        return res.status(401).json({
+            message : "Avatar not uplaoding to cloudinary"
+        })
+    }
+
+    user.avatar = uploadAvatar.url
+    await user.save({validateBeforeSave:false})
+
+    return res.status(201).json({
+        user,
+        message : "Avatar Changed Successfully"
+    })
 })
 
 export {registerUser,
@@ -288,5 +320,6 @@ export {registerUser,
     refreshAccessToken,
     ChangeCurrentPassword,
     GetCurrentUser,
-    UpdateAccountDetails
+    UpdateAccountDetails,
+    updateUserAvatar
 }

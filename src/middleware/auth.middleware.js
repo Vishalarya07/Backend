@@ -5,9 +5,10 @@ import {asyncHandler} from "../utils/asyncHandler.js"
 const verifyJWT = asyncHandler(async (req,res,next) => {
 
     try {
-        const token = req.cookies?.accesstoken || req.header("Authorization")?.replace("Bearer ", "")
-        // console.log(req.cookies)
-        // console.log(token)
+        console.log(req.cookies)
+        const token = req.cookies?.accessToken || req.header("Authorization")?.replace("Bearer ", "")
+        
+        console.log(token)
     
         if(!token){
             res.status(400).json({
@@ -16,7 +17,7 @@ const verifyJWT = asyncHandler(async (req,res,next) => {
         }
 
         const decodedtoken = jwt.verify(token, process.env.ACCESS_TOKEN_SECRET)
-        console.log(decodedtoken);
+        // console.log(decodedtoken);
         
         const user = await User.findById(decodedtoken?._id).select("-password -refreshToken")
     
