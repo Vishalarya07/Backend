@@ -314,6 +314,41 @@ const updateUserAvatar = asyncHandler(async(req,res)=>{
     })
 })
 
+const updateUserCoverImage = asyncHandler(async(req,res)=>{
+
+    const user = await User.findById(req.user?._id).select("-password -refreshToken")
+
+    if(!user){
+        return res.status(401).json({
+            message : "Unauthorized User"
+        })
+    }
+
+    const localStoragePathCoverImage = req.file?.path
+
+    if(!localStoragePathCoverImage){
+        return res.status(401).json({
+            message : "CoverImage not Uploaded"
+        })
+    }
+
+    const uploadCoverImage = await uploadonCloudinary(localStoragePathCoverImage)
+
+    if(!uploadCoverImage.url){
+        return res.status(401).json({
+            message : "CoverImage not uplaoding to cloudinary"
+        })
+    }
+
+    user.coverImage = uploadCoverImage.url
+    await user.save({validateBeforeSave:false})
+
+    return res.status(201).json({
+        user,
+        message : "CoverImage Changed Successfully"
+    })
+})
+
 export {registerUser,
     loginUser,
     logoutUser,
@@ -321,5 +356,6 @@ export {registerUser,
     ChangeCurrentPassword,
     GetCurrentUser,
     UpdateAccountDetails,
-    updateUserAvatar
+    updateUserAvatar,
+    updateUserCoverImage
 }
