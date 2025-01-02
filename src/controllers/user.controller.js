@@ -349,6 +349,81 @@ const updateUserCoverImage = asyncHandler(async(req,res)=>{
     })
 })
 
+const getUserChannelProfile = asyncHandler(async (req,res) => {
+
+    const {username} = req.params
+
+    if (!username?.trim()) {
+        return res.status(401).json({
+            message : "UserName is Missing"
+        })
+    }
+
+    const channel = await User.aggregate([
+        {
+            $match : {
+                username : username
+            }
+        },
+        {
+            $lookup : {
+                from : "subscribers",
+                localField : "_id",
+                foreignField : "channel",
+                as : "subscribers"
+            }
+        },
+        {
+            $lookup : {
+                from : "subscribers",
+                localField : "_id",
+                foreignField : "subscriber",
+                as : "subscribedTo"
+            }
+        },
+        {
+            $addFields : {
+                subscribersCount : {
+                    $size : "$subscribers"
+                },
+                channelsSubscribedTo : {
+                    $size : "$subscribedTo"
+                },
+                isSubscribed : {
+                    $cond : {
+                        if : {$in : [req.user?._id, "$subscribers.subscriber"]},
+                        then : true,
+                        else : false
+                    }
+                }
+            }
+        },
+        {
+            $project : {
+                fullName : 1,
+                username : 1,
+                email : 1,
+                subscribersCount: 1,
+                channelsSubscribedTo : 1,
+                avatar : 1,
+                coverImage : 1
+            }
+        }
+    ])
+
+    if(!channel?.length){
+        return res.status(401),json({
+            message : "Channel not found"
+        })
+    }
+
+    return res.status(200).json({
+        channel : channel[0],
+        message : "User Channel fetched Successfully"
+    })
+
+})
+
 export {registerUser,
     loginUser,
     logoutUser,
